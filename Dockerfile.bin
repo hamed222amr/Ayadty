@@ -1,0 +1,26 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+ENV ACCEPT_EULA=Y
+ENV SA_PASSWORD=YourStrong@Passw0rd
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl apt-transport-https \
+    && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list > /etc/apt/sources.list.d/mssql-server.list \
+    && apt-get update && apt-get install -y --no-install-recommends mssql-server \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+RUN dotnet restore Ayadty.sln
+RUN dotnet build Ayadty.sln -c Release --no-restore
+
+RUN (/opt/mssql/bin/sqlservr &) && sleep 20 \
+    && dotnet ef database update --project DataAccessLayer --startup-project presentationLayer
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8080
+
+CMD ["/entrypoint.sh"]
